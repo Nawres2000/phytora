@@ -1,0 +1,334 @@
+{
+ "Apple___Apple_scab": {
+  "plant": "Pomme",
+  "disease": "Tavelure (Apple scab)",
+  "healthy": false,
+  "symptoms": "Taches olive à brun foncé, veloutées, sur les feuilles et les fruits ; feuilles déformées qui tombent tôt, fruits liégeux et fissurés.",
+  "prevention": "Ramasser et détruire les feuilles mortes en automne, tailler pour aérer l’arbre, choisir des variétés résistantes, traiter préventivement au débourrement.",
+  "links": [
+   {
+    "title": "Symptômes et caractéristiques (INRAE)",
+    "url": "https://ephytia.inrae.fr/fr/Contents/view/16239/Hypp-encyclopedie-en-protection-des-plantes-Caracteristiques-et-symptomes-de-la-maladie"
+   },
+   {
+    "title": "Moyens de protection (INRAE)",
+    "url": "https://ephytia.inrae.fr/fr/C/23145/Pomme-Moyens-de-protection"
+   }
+  ]
+ },
+ "Apple___Black_rot": {
+  "plant": "Pomme",
+  "disease": "Pourriture noire (Black rot)",
+  "healthy": false,
+  "symptoms": "Taches brunes à centre clair (« œil de grenouille ») sur les feuilles ; fruits qui pourrissent puis se momifient ; chancres sur les branches.",
+  "prevention": "Éliminer les fruits momifiés et le bois chancreux, tailler pour aérer, désinfecter les outils.",
+  "links": []
+ },
+ "Apple___Cedar_apple_rust": {
+  "plant": "Pomme",
+  "disease": "Rouille grillagée (Cedar apple rust)",
+  "healthy": false,
+  "symptoms": "Taches jaune-orangé vif sur les feuilles, parfois avec de petits points noirs, puis excroissances en tubes sous la feuille.",
+  "prevention": "Éloigner les genévriers et cèdres (hôtes alternatifs), choisir des variétés résistantes, traiter préventivement au printemps.",
+  "links": []
+ },
+ "Apple___healthy": {
+  "plant": "Pomme",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Blueberry___healthy": {
+  "plant": "Myrtille",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Cherry_(including_sour)___Powdery_mildew": {
+  "plant": "Cerise",
+  "disease": "Oïdium (Powdery mildew)",
+  "healthy": false,
+  "symptoms": "Feutrage blanc poudreux sur les jeunes feuilles qui s’enroulent et se déforment.",
+  "prevention": "Aérer la couronne, éviter l’excès d’azote, retirer les pousses atteintes, traiter préventivement (soufre).",
+  "links": []
+ },
+ "Cherry_(including_sour)___healthy": {
+  "plant": "Cerise",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": {
+  "plant": "Maïs",
+  "disease": "Cercosporiose grise (Gray leaf spot)",
+  "healthy": false,
+  "symptoms": "Taches rectangulaires gris-brun délimitées par les nervures, qui peuvent couvrir toute la feuille.",
+  "prevention": "Pratiquer la rotation, enfouir les résidus de culture, choisir des hybrides tolérants, éviter les semis trop denses.",
+  "links": []
+ },
+ "Corn_(maize)___Common_rust_": {
+  "plant": "Maïs",
+  "disease": "Rouille commune (Common rust)",
+  "healthy": false,
+  "symptoms": "Pustules brun-rougeâtre poudreuses sur les deux faces des feuilles.",
+  "prevention": "Utiliser des variétés résistantes, éviter les densités de semis trop élevées.",
+  "links": [
+   {
+    "title": "Fiche Plantwise",
+    "url": "https://plantwiseplusknowledgebank.org/doi/full/10.1079/pwkb.20267800057"
+   }
+  ]
+ },
+ "Corn_(maize)___Northern_Leaf_Blight": {
+  "plant": "Maïs",
+  "disease": "Helminthosporiose du nord (Northern leaf blight)",
+  "healthy": false,
+  "symptoms": "Grandes taches allongées « en cigare », gris-vert puis brunes, sur les feuilles.",
+  "prevention": "Choisir des hybrides résistants, pratiquer la rotation, enfouir les résidus de culture.",
+  "links": []
+ },
+ "Corn_(maize)___healthy": {
+  "plant": "Maïs",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Grape___Black_rot": {
+  "plant": "Raisin",
+  "disease": "Pourriture noire (Black rot)",
+  "healthy": false,
+  "symptoms": "Taches brunes cerclées avec de petits points noirs sur les feuilles ; baies qui se flétrissent en momies noires.",
+  "prevention": "Retirer les baies momifiées, aérer la vigne, traiter préventivement avant et après la floraison.",
+  "links": []
+ },
+ "Grape___Esca_(Black_Measles)": {
+  "plant": "Raisin",
+  "disease": "Esca (Black measles)",
+  "healthy": false,
+  "symptoms": "Feuilles « tigrées » (zones jaunes ou rouges entre les nervures puis desséchées), baies à petites taches sombres, dépérissement du cep.",
+  "prevention": "Pas de traitement curatif : tailler par temps sec, protéger les plaies de taille, éviter les grosses plaies, éliminer les ceps atteints.",
+  "links": []
+ },
+ "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)": {
+  "plant": "Raisin",
+  "disease": "Brûlure des feuilles (Isariopsis leaf spot)",
+  "healthy": false,
+  "symptoms": "Taches brun-rougeâtre irrégulières sur les feuilles, chute prématurée du feuillage.",
+  "prevention": "Aérer la vigne, éliminer les feuilles tombées, traiter préventivement si la pression est forte.",
+  "links": []
+ },
+ "Grape___healthy": {
+  "plant": "Raisin",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Orange___Haunglongbing_(Citrus_greening)": {
+  "plant": "Orange",
+  "disease": "Huanglongbing (Citrus greening)",
+  "healthy": false,
+  "symptoms": "Feuilles marbrées de jaune de façon asymétrique, fruits petits, déformés et amers, dépérissement de l’arbre. Transmis par le psylle asiatique des agrumes.",
+  "prevention": "Aucun traitement curatif : lutter contre le psylle, planter des plants certifiés, arracher les arbres atteints et signaler le cas aux services phytosanitaires (organisme de quarantaine).",
+  "links": []
+ },
+ "Peach___Bacterial_spot": {
+  "plant": "Pêche",
+  "disease": "Tache bactérienne (Bacterial spot)",
+  "healthy": false,
+  "symptoms": "Petites taches angulaires violacées qui se perforent (« criblure »), fruits tachés et fissurés.",
+  "prevention": "Choisir des variétés tolérantes, éviter l’excès d’azote, aérer, appliquer des produits cupriques en prévention.",
+  "links": []
+ },
+ "Peach___healthy": {
+  "plant": "Pêche",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Pepper,_bell___Bacterial_spot": {
+  "plant": "Poivron",
+  "disease": "Tache bactérienne (Bacterial spot)",
+  "healthy": false,
+  "symptoms": "Petites taches humides vert foncé devenant brunes avec un halo jaune sur les feuilles ; pustules rugueuses sur les fruits.",
+  "prevention": "Semer des graines saines, pratiquer une rotation de 2 à 3 ans, éviter l’arrosage par aspersion, traiter au cuivre en prévention.",
+  "links": []
+ },
+ "Pepper,_bell___healthy": {
+  "plant": "Poivron",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Potato___Early_blight": {
+  "plant": "Pomme de terre",
+  "disease": "Alternariose (Early blight)",
+  "healthy": false,
+  "symptoms": "Taches brunes en cercles concentriques (« cible ») sur les feuilles les plus âgées.",
+  "prevention": "Pratiquer la rotation, fertiliser de façon équilibrée, éliminer les débris de culture, traiter si besoin.",
+  "links": []
+ },
+ "Potato___Late_blight": {
+  "plant": "Pomme de terre",
+  "disease": "Mildiou (Late blight)",
+  "healthy": false,
+  "symptoms": "Taches vert sombre d’aspect huileux devenant brunes, avec un feutrage blanc dessous par temps humide ; tubercules qui pourrissent.",
+  "prevention": "Utiliser des plants sains, éviter l’aspersion, butter, surveiller les alertes mildiou, traiter préventivement et détruire les fanes atteintes.",
+  "links": []
+ },
+ "Potato___healthy": {
+  "plant": "Pomme de terre",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Raspberry___healthy": {
+  "plant": "Framboise",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Soybean___healthy": {
+  "plant": "Soja",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Squash___Powdery_mildew": {
+  "plant": "Courge",
+  "disease": "Oïdium (Powdery mildew)",
+  "healthy": false,
+  "symptoms": "Poudre blanche sur les deux faces des feuilles, qui jaunissent et se dessèchent.",
+  "prevention": "Choisir des variétés résistantes, espacer les plants, éviter l’excès d’azote, traiter au soufre ou au bicarbonate en début d’attaque.",
+  "links": []
+ },
+ "Strawberry___Leaf_scorch": {
+  "plant": "Fraise",
+  "disease": "Brûlure des feuilles (Leaf scorch)",
+  "healthy": false,
+  "symptoms": "Nombreuses petites taches pourpres sur les feuilles, dont les bords se dessèchent comme brûlés.",
+  "prevention": "Planter des plants sains, retirer les feuilles atteintes, éviter l’excès d’humidité, ne pas trop densifier, faire une rotation.",
+  "links": []
+ },
+ "Strawberry___healthy": {
+  "plant": "Fraise",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ },
+ "Tomato___Bacterial_spot": {
+  "plant": "Tomate",
+  "disease": "Tache bactérienne (Bacterial spot)",
+  "healthy": false,
+  "symptoms": "Petites taches brunes à noires d’aspect gras, parfois avec un halo jaune ; fruits à surface rugueuse.",
+  "prevention": "Semer des graines saines, pratiquer la rotation, éviter les éclaboussures et l’arrosage du feuillage.",
+  "links": []
+ },
+ "Tomato___Early_blight": {
+  "plant": "Tomate",
+  "disease": "Alternariose (Early blight)",
+  "healthy": false,
+  "symptoms": "Taches noires concentriques sur les feuilles inférieures, entraînant leur jaunissement et leur chute.",
+  "prevention": "Rotation des cultures, paillage pour éviter les éclaboussures, traitements fongiques.",
+  "links": [
+   {
+    "title": "Méthodes de protection (INRAE)",
+    "url": "https://beta.ephytia.inrae.fr/fr/Contents/view/5204/Tomate-Methodes-de-protection"
+   }
+  ]
+ },
+ "Tomato___Late_blight": {
+  "plant": "Tomate",
+  "disease": "Mildiou (Late blight)",
+  "healthy": false,
+  "symptoms": "Taches brunes irrégulières sur les feuilles, souvent entourées d’un halo jaune. Les fruits peuvent pourrir.",
+  "prevention": "Éviter l’arrosage par aspersion, retirer les plants infectés, utiliser des fongicides préventifs.",
+  "links": [
+   {
+    "title": "Fiche INRAE - VigiMildiou Tomate",
+    "url": "https://ephytia.inrae.fr/fr/Contents/view/26873/VigiMildiou-Le-mildiou-de-la-tomate"
+   },
+   {
+    "title": "INRAE - Les mildious de la tomate",
+    "url": "https://ephytia.inrae.fr/fr/Contents/view/5151/Tomate-Les-mildious-aerien-et-terrestre-Phytophthora-infestans-et-P-nicotianae"
+   }
+  ]
+ },
+ "Tomato___Leaf_Mold": {
+  "plant": "Tomate",
+  "disease": "Cladosporiose (Leaf mold)",
+  "healthy": false,
+  "symptoms": "Taches jaunes sur le dessus des feuilles et feutrage olive à violacé dessous ; fréquent sous serre humide.",
+  "prevention": "Ventiler et réduire l’humidité, tuteurer pour aérer, choisir des variétés résistantes.",
+  "links": []
+ },
+ "Tomato___Septoria_leaf_spot": {
+  "plant": "Tomate",
+  "disease": "Septoriose (Septoria leaf spot)",
+  "healthy": false,
+  "symptoms": "Nombreuses petites taches rondes à centre clair et bordure sombre, avec de petits points noirs, sur les feuilles basses.",
+  "prevention": "Pratiquer la rotation, pailler, retirer les feuilles atteintes, éviter de mouiller le feuillage.",
+  "links": []
+ },
+ "Tomato___Spider_mites Two-spotted_spider_mite": {
+  "plant": "Tomate",
+  "disease": "Acariens (Spider mites)",
+  "healthy": false,
+  "symptoms": "Petits points jaunes (piqûres), fines toiles sous les feuilles qui deviennent bronzées et sèches.",
+  "prevention": "Maintenir une humidité suffisante, surveiller dès le début, favoriser les auxiliaires (Phytoseiulus), utiliser savon insecticide ou huile.",
+  "links": []
+ },
+ "Tomato___Target_Spot": {
+  "plant": "Tomate",
+  "disease": "Tache cible (Target spot)",
+  "healthy": false,
+  "symptoms": "Taches brunes à anneaux concentriques sur les feuilles et les fruits.",
+  "prevention": "Aérer la culture, pratiquer la rotation, éviter de mouiller le feuillage.",
+  "links": []
+ },
+ "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+  "plant": "Tomate",
+  "disease": "Virus des feuilles jaunes en cuillère (TYLCV)",
+  "healthy": false,
+  "symptoms": "Feuilles enroulées vers le haut et jaunies, plants rabougris. Transmis par les aleurodes (mouches blanches).",
+  "prevention": "Aucun traitement curatif : lutter contre les aleurodes, utiliser des filets anti-insectes, choisir des variétés tolérantes, arracher les plants atteints.",
+  "links": []
+ },
+ "Tomato___Tomato_mosaic_virus": {
+  "plant": "Tomate",
+  "disease": "Virus de la mosaïque (ToMV)",
+  "healthy": false,
+  "symptoms": "Mosaïque vert clair et vert foncé, feuilles déformées en « fougère ». Très contagieux par contact.",
+  "prevention": "Aucun traitement curatif : semences saines, désinfecter outils et mains, éliminer les plants atteints, faire une rotation.",
+  "links": []
+ },
+ "Tomato___healthy": {
+  "plant": "Tomate",
+  "disease": "En bonne santé",
+  "healthy": true,
+  "symptoms": "Feuillage d’aspect normal : pas de tache, de déformation ni de décoloration visibles.",
+  "prevention": "Continuez la surveillance régulière : arrosez au pied, aérez la culture et retirez les feuilles abîmées.",
+  "links": []
+ }
+}

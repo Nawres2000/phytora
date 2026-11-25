@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-phytora-dark: #3E5A27;
+  --color-phytora-mid: #6A8A3A;
+  --color-phytora-light: #8DB33A;
+  --color-phytora-accent: #2A9D8F;
+  --color-phytora-warn: #E9A23B;
+}
+
+@keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+@keyframes slowZoom { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+.input-phytora {
+  width: 100%; padding: 0.75rem 1rem; background-color: #f9fafb; border: 1px solid #e5e7eb;
+  border-radius: 0.75rem; outline: none; transition: all 0.2s ease;
+}
+.input-phytora:focus { background-color: #fff; border-color: transparent; box-shadow: 0 0 0 2px var(--color-phytora-light); }
+
+.btn-phytora {
+  width: 100%; padding: 0.875rem 1rem; border-radius: 0.75rem;
+  background: linear-gradient(to right, #3E5A27, #8DB33A); color: #fff; font-weight: 700; font-size: 1.125rem;
+  box-shadow: 0 10px 15px -3px rgba(141, 179, 58, 0.3), 0 4px 6px -2px rgba(141, 179, 58, 0.15);
+  transition: all 0.2s ease; display: flex; justify-content: center; align-items: center; cursor: pointer;
+}
+.btn-phytora:hover:not(:disabled) { box-shadow: 0 20px 25px -5px rgba(141, 179, 58, 0.4); transform: translateY(-2px); }
+.btn-phytora:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.btn-phytora:disabled { opacity: 0.5; cursor: not-allowed; }
+
+:focus-visible { outline: 3px solid var(--color-phytora-warn); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* probability bars grow from 0 to their value when they appear */
+@keyframes barGrow { from { width: 0; } }
+.bar-grow { animation: barGrow 0.9s cubic-bezier(0.22, 1, 0.36, 1); transition: width 0.5s ease; }

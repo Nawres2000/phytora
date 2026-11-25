@@ -1,0 +1,81 @@
+name: CI - lint & tests
+
+on:
+  push:
+    branches: [main, rayen]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-lint:
+    name: Python lint (flake8, black) + DVC pipeline check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt dvc==3.67.1
+      - run: flake8 src backend tests
+      - run: black --check src backend tests
+      - name: dvc.yaml is valid
+        run: dvc dag
+
+  python-tests:
+    name: Pytest (pipeline + FastAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install (CPU PyTorch)
+        run: |
+          pip install -r backend/requirements.txt -r backend/requirements-explain.txt
+          pip install -r requirements-dev.txt scikit-learn==1.9.1 pandas==3.0.5 matplotlib==3.11.2
+      - run: pytest -v --junitxml=pytest-report.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+
+  gateway:
+    name: Gateway (eslint + node:test with in-memory MongoDB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gateway/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  frontend:
+    name: Frontend (eslint + production build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

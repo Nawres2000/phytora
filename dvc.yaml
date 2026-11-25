@@ -1,0 +1,81 @@
+# Pipeline reproductible : `dvc repro` (ne relance que les étapes dont les dépendances ont changé)
+# Graphe : `dvc dag` | Métriques : `dvc metrics show` | Comparaison d'expériences : `dvc exp show`
+stages:
+  prepare:
+    cmd: python -m src.data.prepare
+    deps:
+      - src/data/prepare.py
+      - data/raw/plantvillage
+    params:
+      - seed
+      - data
+    outs:
+      - data/processed
+    metrics:
+      - reports/data.json:
+          cache: false
+
+  train:
+    cmd: python -m src.models.train
+    deps:
+      - src/data/dataset.py
+      - src/data/augment.py
+      - src/models/architecture.py
+      - src/models/losses.py
+      - src/models/train.py
+      - data/processed
+    params:
+      - seed
+      - train
+    outs:
+      - models/model.pt
+    metrics:
+      - reports/train.json:
+          cache: false
+    plots:
+      - reports/train_history.csv:
+          x: epoch
+          y: val_macro_f1
+          cache: false
+      - reports/learning_curves.png:
+          cache: false
+
+  evaluate:
+    cmd: python -m src.models.evaluate
+    deps:
+      - src/models/evaluate.py
+      - src/models/checkpoint.py
+      - models/model.pt
+      - data/processed
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/confusion_matrix.png:
+          cache: false
+    outs:
+      - reports/classification_report.json:
+          cache: false
+      - reports/per_class.csv:
+          cache: false
+      - reports/top_confusions.csv:
+          cache: false
+
+  export:
+    cmd: python -m src.models.export
+    deps:
+      - src/models/export.py
+      - models/model.pt
+      - reports/metrics.json
+      - data/processed
+    params:
+      - export
+    outs:
+      - models/model.onnx
+      - models/model.int8.onnx
+      - models/model.fp16.onnx
+      - models/metadata.json:
+          cache: false
+    metrics:
+      - reports/export.json:
+          cache: false

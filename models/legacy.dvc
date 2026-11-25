@@ -1,0 +1,6 @@
+outs:
+- md5: 83b563fb8b86c6c69f84ba23ee044934.dir
+  size: 17636906
+  nfiles: 7
+  hash: md5
+  path: legacy
