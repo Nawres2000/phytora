@@ -6,7 +6,7 @@ import farmerBg from '@/assets/farmer.jpg';
 
 const FEATURES = [
   { icon: Leaf, color: 'text-phytora-light', title: 'Diagnostic foliaire', text: 'Analysez les maladies de vos cultures à partir d’une simple photo.' },
-  { icon: ScanLine, color: 'text-phytora-accent', title: 'Détection de mauvaises herbes', text: 'Localisez avec précision les zones à traiter pour optimiser vos interventions.' },
+  { icon: ScanLine, color: 'text-phytora-accent', title: 'Explicable et en direct', text: 'Carte Grad-CAM, estimation de la sévérité et diagnostic en temps réel depuis la webcam.' },
   { icon: ShieldCheck, color: 'text-phytora-warn', title: 'Modèles traçables', text: 'Une démarche MLOps rigoureuse pour des prédictions fiables et suivies.' },
 ];
 
@@ -37,7 +37,7 @@ export default function LandingPage() {
             Voyez <span className="text-phytora-light">au-delà</span> de la feuille.
           </h1>
           <p className="text-lg md:text-xl text-gray-200 max-w-xl mb-10 animate-[fadeInUp_1s_ease-out_0.4s_both]">
-            Détectez les mauvaises herbes et diagnostiquez les maladies foliaires en quelques secondes.
+            Diagnostiquez 38 maladies foliaires en quelques secondes, puis demandez conseil à notre assistant.
             PHYTORA associe la vision par ordinateur à votre expertise agronomique.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 animate-[fadeInUp_1s_ease-out_0.6s_both]">

@@ -103,4 +103,22 @@ r.post('/predict/live', requireAuth, upload.single('file'), wrap(async (req, res
   res.json({ ...toClient(data), gateway_ms: Math.round(performance.now() - t0) });
 }));
 
+// Annotated image (Grad-CAM, Score-CAM or severity mask) as PNG, straight from FastAPI
+r.post('/predict/visualize', requireAuth, upload.single('file'), wrap(async (req, res) => {
+  const overlay = ['gradcam', 'scorecam', 'severity'].includes(req.query.overlay) ? req.query.overlay : 'gradcam';
+  let resp;
+  try {
+    resp = await fetch(`${MODEL()}/predict/visualize?overlay=${overlay}`, { method: 'POST', body: imageForm(req), signal: AbortSignal.timeout(30000) });
+  } catch {
+    throw Object.assign(new Error('Le service du modèle est injoignable. FastAPI est-il lancé ?'), { status: 502 });
+  }
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw Object.assign(new Error(typeof data.detail === 'string' ? data.detail : 'Visualisation impossible.'), { status: resp.status === 501 ? 501 : 502 });
+  }
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'no-store');
+  res.send(Buffer.from(await resp.arrayBuffer()));
+}));
+
 export default r;

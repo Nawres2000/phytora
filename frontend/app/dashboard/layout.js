@@ -2,9 +2,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, LayoutDashboard, ScanLine, History, Leaf, BookOpen, Menu, X, User, Settings, ShieldCheck } from 'lucide-react';
+import { LogOut, LayoutDashboard, ScanLine, History, Leaf, BookOpen, Menu, X, User, Settings, ShieldCheck, Cpu } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Logo from '@/components/Logo';
+import ChatWidget from '@/components/ChatWidget';
+import { ChatProvider } from '@/context/ChatContext';
 
 const NAV = [
   { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -12,6 +14,7 @@ const NAV = [
   { href: '/dashboard/history', label: 'Historique', icon: History },
   { href: '/dashboard/crops', label: 'Mes cultures', icon: Leaf },
   { href: '/dashboard/guide', label: 'Guide des maladies', icon: BookOpen },
+  { href: '/dashboard/model', label: 'Modèle IA & MLOps', icon: Cpu },
   { href: '/dashboard/profile', label: 'Profil & paramètres', icon: User },
 ];
 
@@ -29,6 +32,7 @@ export default function DashboardLayout({ children }) {
   const isActive = (href) => (href === '/dashboard' ? pathname === href : pathname.startsWith(href));
 
   return (
+    <ChatProvider>
     <div className="min-h-screen bg-gray-50 flex overflow-hidden">
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setOpen(false)} />}
 
@@ -78,6 +82,8 @@ export default function DashboardLayout({ children }) {
         </div>
         <div className="flex-1 overflow-y-auto">{children}</div>
       </main>
+      <ChatWidget />
     </div>
+    </ChatProvider>
   );
 }

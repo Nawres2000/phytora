@@ -157,6 +157,7 @@ def bench(fn, n=50, warmup=5):
 
 
 def evaluate_variant(sess, arrays, labels, ref_pred=None):
+    """`arrays` is an iterable of preprocessed images (a generator: the test set is never held in memory)."""
     preds = np.array([int(sess.run(None, {"input": a})[0].argmax()) for a in arrays])
     out = {"images": len(preds)}
     known = labels >= 0
@@ -238,13 +239,16 @@ def main():
         calib_arrays = [rng.standard_normal((1, 3, size, size), dtype=np.float32) for _ in range(16)]
     if e.get("eval_images") and len(test) > e["eval_images"]:
         test = [test[i] for i in rng.choice(len(test), size=e["eval_images"], replace=False)]
-    test_arrays = [preprocess(Image.open(p), size, mean, std) for p, _ in test]
+
+    def test_arrays():  # streamed: preprocessing again per variant is cheaper than keeping ~8k images in RAM
+        return (preprocess(Image.open(p), size, mean, std) for p, _ in test)
+
     test_labels = np.array([c for _, c in test])
 
     # 1) FP32 + parity with PyTorch
     fp32 = out / "model.onnx"
     export_onnx(model, size, fp32, e["opset"])
-    probe = np.concatenate((test_arrays or calib_arrays)[:16])
+    probe = np.concatenate([preprocess(Image.open(p), size, mean, std) for p, _ in test[:16]] or calib_arrays[:16])
     with torch.no_grad():
         ref = model(torch.from_numpy(probe)).numpy()
     s32 = session(fp32)
@@ -282,8 +286,8 @@ def main():
                 "size_mb": round(path.stat().st_size / 1e6, 2),
                 "latency_ms": bench(lambda: sess.run(None, {"input": x1})),
             }
-            if test_arrays:
-                metrics, preds = evaluate_variant(sess, test_arrays, test_labels, ref_pred)
+            if test:
+                metrics, preds = evaluate_variant(sess, test_arrays(), test_labels, ref_pred)
                 info.update(metrics)
                 if name == "fp32":
                     ref_pred = preds

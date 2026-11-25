@@ -16,11 +16,11 @@ export default function HistoryPage() {
 
   function exportCsv() {
     const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const head = ['Date', 'Type', 'Plante', 'Diagnostic', 'Confiance (%)', 'Incertain', 'Retour', 'Mauvaises herbes', 'Cultures'];
+    const head = ['Date', 'Plante', 'Diagnostic', 'Confiance (%)', 'Sévérité (%)', 'Niveau', 'Incertain', 'Retour', 'Latence (ms)', 'Modèle'];
     const rows = scans.map((s) => [
-      new Date(s.createdAt).toLocaleString('fr-FR'), s.task === 'detection' ? 'Détection' : 'Diagnostic', s.plant, s.disease,
-      s.confidence != null ? Math.round(s.confidence * 100) : '', s.uncertain ? 'oui' : 'non',
-      s.feedback?.correct === true ? 'confirmé' : s.feedback?.correct === false ? 'corrigé' : '', s.weeds, s.crops,
+      new Date(s.createdAt).toLocaleString('fr-FR'), s.plant, s.disease,
+      s.confidence != null ? Math.round(s.confidence * 100) : '', s.severity?.percent ?? '', s.severity?.level ?? '', s.uncertain ? 'oui' : 'non',
+      s.feedback?.correct === true ? 'confirmé' : s.feedback?.correct === false ? 'corrigé' : '', s.latencyMs != null ? Math.round(s.latencyMs) : '', s.modelVersion,
     ]);
     const csv = '\ufeff' + [head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n'); // BOM + ; so Excel opens it correctly in French
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: 'phytora-historique.csv' });
