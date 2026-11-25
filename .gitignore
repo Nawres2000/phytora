@@ -1,0 +1,17 @@
+node_modules
+.next
+.env
+.env.local
+__pycache__
+.venv
+*.pyc
+.pytest_cache
+mlflow.db
+mlruns/
+mlartifacts/
+# large artefacts are versioned with DVC, never with Git
+*.pt
+*.pth
+*.onnx
+/data/raw/*
+!/data/raw/.gitkeep
