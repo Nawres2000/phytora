@@ -49,6 +49,10 @@ export default function Admin() {
             [stats.scans ? `${Math.round((100 * stats.uncertain) / stats.scans)} %` : '–', 'Jugées incertaines'],
             [stats.feedbackTotal, 'Retours utilisateurs'],
             [stats.feedbackTotal ? `${Math.round((100 * stats.feedbackCorrect) / stats.feedbackTotal)} %` : '–', 'Diagnostics confirmés'],
+            [stats.avgLatencyMs != null ? `${Math.round(stats.avgLatencyMs)} ms` : '–', 'Latence moyenne API'],
+            [stats.avgInferenceMs != null ? `${Math.round(stats.avgInferenceMs * 10) / 10} ms` : '–', 'Inférence ONNX moyenne'],
+            [stats.conversations ?? 0, 'Conversations assistant'],
+            [stats.chatUp + stats.chatDown ? `${Math.round((100 * stats.chatUp) / (stats.chatUp + stats.chatDown))} % 👍` : '–', `Réponses notées (${(stats.chatUp ?? 0) + (stats.chatDown ?? 0)})`],
           ].map(([v, label]) => (
             <div key={label} className="bg-white rounded-2xl border border-phytora-light/40 shadow-sm p-5">
               <p className="text-3xl font-extrabold text-phytora-dark">{v}</p>

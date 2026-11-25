@@ -110,6 +110,10 @@ test('retrieval finds the right disease sheet', () => {
   assert.ok(tokens('Mes tomates ont des taches').includes('tomate'));
   assert.equal(retrieve('mildiou de la tomate taches brunes')[0].id.startsWith('Tomato___'), true);
   assert.equal(retrieve('n’importe quoi', { prefer: 'Apple___Apple_scab' })[0].id, 'Apple___Apple_scab');
+  assert.equal(retrieve('Comment traiter la moisissure des feuilles de tomate ?')[0].id, 'Tomato___Leaf_Mold');
+  assert.equal(retrieve('poudre blanche sur ma courgette')[0].id, 'Squash___Powdery_mildew');
+  assert.equal(retrieve('rouille du maïs')[0].id, 'Corn_(maize)___Common_rust_');
+  assert.equal(retrieve('mais je ne sais pas').length, 0);
 });
 
 test('chat streams tokens, grounds on the catalog and the scan, and stores the conversation', async () => {

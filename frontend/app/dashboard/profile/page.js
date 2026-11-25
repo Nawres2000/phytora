@@ -17,6 +17,15 @@ const Card = ({ title, children, ...props }) => (
   </form>
 );
 
+function Msg({ k, note }) {
+  if (note.key !== k || !note.text) return null;
+  return (
+    <p role={note.type === 'err' ? 'alert' : 'status'} className={`p-3 rounded-xl text-sm flex items-center gap-2 border ${note.type === 'err' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-200'}`}>
+      {note.type === 'err' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}{note.text}
+    </p>
+  );
+}
+
 export default function Profile() {
   const { user, setUser, logout } = useAuth();
   const fileRef = useRef(null);
@@ -31,11 +40,6 @@ export default function Profile() {
     e.preventDefault(); setNote({});
     try { setNote({ key, type: 'ok', text: await fn() }); } catch (x) { setNote({ key, type: 'err', text: x.message }); }
   };
-  const Msg = ({ k }) => note.key === k && note.text ? (
-    <p role={note.type === 'err' ? 'alert' : 'status'} className={`p-3 rounded-xl text-sm flex items-center gap-2 border ${note.type === 'err' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-200'}`}>
-      {note.type === 'err' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}{note.text}
-    </p>
-  ) : null;
 
   async function onAvatar(e) {
     const f = e.target.files[0];
@@ -72,7 +76,7 @@ export default function Profile() {
             <div className="space-y-5 max-w-md">
               <label className="block"><Label icon={UserIcon}>Nom d’utilisateur</Label>
                 <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={60} className="input-phytora" /></label>
-              <Msg k="profile" />
+              <Msg k="profile" note={note} />
               <button className="px-8 py-2.5 rounded-xl font-bold shadow-lg transition bg-phytora-dark text-white hover:bg-phytora-mid disabled:opacity-50"
                 disabled={name.trim() === user.name && avatar === (user.avatar || null)}>Enregistrer les modifications</button>
             </div>
@@ -91,7 +95,7 @@ export default function Profile() {
           <div><Label icon={Lock}>Mot de passe actuel</Label>
             <PasswordInput value={em.password} onChange={(e) => setEm({ ...em, password: e.target.value })} autoComplete="current-password" /></div>
         </div>
-        <Msg k="email" />
+        <Msg k="email" note={note} />
         <button className="px-6 py-2.5 rounded-xl font-bold bg-phytora-dark text-white hover:bg-phytora-mid transition">Changer l’e-mail</button>
       </Card>
 
@@ -105,7 +109,7 @@ export default function Profile() {
             <PasswordInput value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} autoComplete="new-password" placeholder="Créez un mot de passe fort" /></div>
         </div>
         <PasswordRules value={pw.password} />
-        <Msg k="pw" />
+        <Msg k="pw" note={note} />
         <button disabled={!pw.current || !passwordOk(pw.password)} className="px-6 py-2.5 rounded-xl font-bold bg-phytora-dark text-white hover:bg-phytora-mid transition disabled:opacity-50">Mettre à jour le mot de passe</button>
       </Card>
 
@@ -116,7 +120,7 @@ export default function Profile() {
         <h2 className="text-lg font-bold text-red-700">Supprimer mon compte</h2>
         <p className="text-sm text-gray-500">Cette action supprime votre compte et est irréversible. Vos analyses ne seront plus accessibles.</p>
         <div className="max-w-sm"><PasswordInput value={del} onChange={(e) => setDel(e.target.value)} autoComplete="current-password" placeholder="Votre mot de passe" /></div>
-        <Msg k="del" />
+        <Msg k="del" note={note} />
         <button className="px-6 py-2.5 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition">Supprimer mon compte</button>
       </form>
     </div>

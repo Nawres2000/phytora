@@ -41,7 +41,7 @@ export default function Dashboard() {
       <div className="mt-10 bg-gradient-to-r from-phytora-dark to-phytora-mid rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">Prêt à analyser une nouvelle image ?</h2>
-          <p className="text-white/80">Utilisez notre outil d’IA pour détecter les maladies ou les mauvaises herbes.</p>
+          <p className="text-white/80">Photo, webcam en direct ou exemple : diagnostic, sévérité et conseils de l’assistant.</p>
         </div>
         <Link href="/dashboard/detection" className="mt-6 md:mt-0 px-6 py-3 bg-white text-phytora-dark font-bold rounded-xl hover:bg-gray-100 transition shadow-lg">Lancer une analyse</Link>
       </div>

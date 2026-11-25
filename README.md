@@ -1,39 +1,182 @@
-# PHYTORA
+# PHYTORA : diagnostic des maladies foliaires, de l'entraînement à la production
 
-Diagnostic des maladies foliaires (38 classes PlantVillage) et, à venir, détection de mauvaises herbes.
+**Projet de module Deep Learning Avancé, Axe 1 (CNN & Transfer Learning).** Classification de 38 maladies foliaires (PlantVillage) avec un MobileNetV3 affiné. Le projet couvre tout le cycle MLOps :
+- données versionnées avec DVC, entraînements suivis dans MLflow ;
+- export ONNX, puis quantification INT8 et FP16 ;
+- API FastAPI typée, application web Next.js avec un assistant agronomique ;
+- Docker Compose et CI GitHub Actions.
 
-| dossier | rôle | port |
+```
+Navigateur ──HTTP──▶ Frontend Next.js (3000) ──JSON──▶ Passerelle Express (5000) ──multipart──▶ API FastAPI (8000) ──▶ ONNX Runtime
+                                                  │  comptes, historique, chatbot RAG                 │  /docs Swagger
+                                                  └──▶ MongoDB                                         └──▶ PyTorch (Grad-CAM)
+DVC (données + poids) ──▶ src/ (prepare → train → evaluate → export) ──▶ MLflow (runs + Model Registry, 5001)
+```
+
+## Démarrage en une commande
+
+```bash
+dvc pull                       # récupère les poids du modèle (models/legacy) depuis le remote DVC
+cp .env.example .env           # clé Groq pour l'assistant, JWT_SECRET, e-mails admin
+docker compose up --build
+```
+
+| Service | URL |
+|---|---|
+| Application web | http://localhost:3000 |
+| API FastAPI (Swagger) | http://localhost:8000/docs |
+| MLflow (runs, registre) | http://localhost:5001 |
+| Passerelle (santé) | http://localhost:5000/health |
+
+Sans poids du modèle, `MOCK=1 docker compose up --build` sert des prédictions aléatoires bien formées, marquées « démonstration ». C'est ce mode qu'utilise la CI.
+
+## Arborescence
+
+```
+.github/workflows/   ci-tests.yml (lint + pytest + node:test + build web), docker-build.yml (images + test docker compose)
+data/                raw/ et processed/ : versionnés par DVC, jamais par Git
+src/                 code Deep Learning et MLOps
+  data/              download.py, prepare.py (anti-fuite), dataset.py, augment.py (MixUp/CutMix)
+  models/            architecture.py, losses.py (Focal), train.py (MLflow), evaluate.py, export.py (ONNX/INT8/FP16 + registre), compare.py
+  utils/             gradcam.py (Grad-CAM, Score-CAM), severity.py, common.py
+backend/             API FastAPI : app/main.py (routes), app/schemas.py (Pydantic), app/inference.py (ONNX Runtime), tests/, Dockerfile
+gateway/             Express + MongoDB : comptes, historique, retours utilisateurs, chatbot (streaming SSE + RAG), administration
+frontend/            Next.js + Tailwind : dépôt d'image, webcam en direct, Grad-CAM, sévérité, latences, page Modèle, assistant
+models/              legacy.dvc (modèle actuel) + sorties du pipeline (model.pt, model*.onnx, metadata.json)
+tests/               tests unitaires du pipeline (pytest)
+dvc.yaml, params.yaml   pipeline reproductible et hyperparamètres
+docker-compose.yml   mongo, mlflow, backend, gateway, frontend
+report/              rapport technique LaTeX
+```
+
+> Écart assumé avec l'arborescence type : le frontend appelle une **passerelle Express** et non FastAPI directement. La passerelle gère l'authentification, l'historique MongoDB et le chatbot, et laisse FastAPI se concentrer sur l'inférence. L'API FastAPI reste exposée et documentée sur le port 8000.
+
+## 1. Données et modélisation (`src/`, DVC, MLflow)
+
+```bash
+pip install -r requirements-train.txt
+python -m src.data.download          # Kaggle abdallahalidev/plantvillage-dataset → data/raw/plantvillage/color
+dvc add data/raw/plantvillage && dvc push
+dvc repro                            # prepare → train → evaluate → export (ne relance que ce qui a changé)
+dvc metrics show && dvc plots show
+mlflow ui --backend-store-uri sqlite:///mlflow.db   # ou le serveur MLflow de docker compose
+```
+
+**Comparer des architectures et des stratégies** (chaque expérience devient un run MLflow) :
+
+```bash
+dvc exp run -S train.model=baseline_cnn
+dvc exp run -S train.model=mobilenet_v3_small
+dvc exp run -S train.model=efficientnet_v2_s
+dvc exp run -S train.loss=focal -S train.mix=cutmix -S train.randaugment=true
+python -m src.models.compare         # → reports/comparison.md
+```
+
+Sur GPU Kaggle ou Colab, définissez `MLFLOW_TRACKING_URI` vers votre serveur MLflow (par exemple DagsHub) pour retrouver les runs ensuite.
+
+| Étape | Contenu |
+|---|---|
+| `prepare` | MD5, puis retrait des étiquettes contradictoires et des doublons exacts. Regroupement des quasi-doublons (dHash), puis split stratifié 70/15/15 **par groupe**. Contrôle qu'aucun contenu ne se retrouve dans deux splits. |
+| `train` | Transfer learning en 2 phases : tête seule, puis derniers blocs dégelés. BatchNorm figées, AdamW, cosine, AMP. Pertes : CE pondérée ou Focal Loss. MixUp, CutMix, RandAugment. Meilleur epoch retenu sur le F1 macro de validation. |
+| `evaluate` | Évaluation unique sur le test : exactitude, F1 macro et pondéré, top-3, rapport par classe, matrice de confusion, confusions principales. |
+| `export` | ONNX FP32 (parité vérifiée < 1e-3), FP16, puis **INT8 statique mixte guidé par la sensibilité**. Banc de mesure (taille, latence, exactitude). Enregistrement dans le registre MLflow (alias `staging` ; promu en `production` s'il bat le modèle en place). |
+
+**Résultats du modèle servi** (MobileNetV3-Small, test PlantVillage) : **98,8 %** d'exactitude, **98,3 %** de F1 macro. La baseline CNN atteint 95,5 % et 94,2 %.
+
+Export mesuré sur CPU, 1 image :
+
+| Variante | Taille | Latence | Exactitude* |
+|---|---|---|---|
+| PyTorch | 6,4 Mo | 5,7 ms | – |
+| ONNX FP32 | 6,2 Mo | 1,5 ms | 99,1 % |
+| ONNX INT8 | 1,9 Mo | 1,9 ms | 98,2 % |
+| ONNX FP16 | 3,2 Mo | 7,5 ms | 99,1 % |
+
+\*Mesurée sur 225 images PlantVillage (15 classes), indépendantes de celles de calibration.
+
+**Pourquoi un INT8 « mixte » ?** Quantifier toutes les couches faisait tomber l'exactitude à 4 %. Le BatchNorm fusionné laisse quelques canaux des premières couches avec des plages énormes, et une seule échelle par tenseur écrase les autres canaux. `export.py` quantifie donc chaque couche isolément, mesure la dérive des logits, et garde en FP32 les couches les plus sensibles jusqu'à 98 % d'accord avec FP32. Ici, 4 couches sur 54 restent en FP32.
+
+**Limites** :
+- PlantVillage contient des photos de laboratoire (feuille seule, fond uni). Au champ, la performance sera plus basse.
+- Le Grad-CAM montre que le modèle regarde parfois le fond.
+- Le dHash ne regroupe que les quasi-copies, pas plusieurs photos d'une même feuille : le score de test reste probablement optimiste.
+
+## 2. API FastAPI (`backend/`)
+
+```bash
+pip install -r backend/requirements.txt -r backend/requirements-explain.txt
+uvicorn backend.app.main:app --port 8000      # depuis la racine du dépôt
+```
+
+| Méthode | Route | Rôle |
 |---|---|---|
-| `frontend/` | Next.js (App Router) + Tailwind 4 | 3000 |
-| `backend/` | Express + MongoDB : comptes, e-mails, historique, retours utilisateurs, chatbot Groq, administration | 5000 |
-| `model-api/` | FastAPI + PyTorch : MobileNetV3-Small (`models/mobilenet_v3_small_best.pt`) + Grad-CAM | 8000 |
+| GET | `/health` | état, GPU (fournisseurs ONNX Runtime), version du modèle, explicabilité disponible |
+| GET | `/model/metadata` | architecture, classes, métriques val/test, benchmark baseline, variantes ONNX |
+| POST | `/predict` | top-k, incertitude, sévérité, Grad-CAM optionnel (`explain=true`, `method=gradcam\|scorecam`), latences détaillées |
+| POST | `/predict/visualize` | PNG annoté : `overlay=gradcam\|scorecam\|severity` |
+| POST | `/predict/batch` | jusqu'à 16 images |
 
-## Lancer
+Toutes les réponses sont validées par des schémas Pydantic stricts. Les erreurs renvoient des codes HTTP explicites :
+- 400 : fichier qui n'est pas une image ;
+- 413 : image trop grande ;
+- 422 : paramètres invalides ;
+- 501 : explicabilité indisponible ;
+- 503 : modèle non chargé.
 
-1. **MongoDB** doit tourner (ou mettez une URI Atlas dans `MONGO_URI`).
-2. **Modèle** : `cd model-api && pip install -r requirements.txt && uvicorn main:app --port 8000`
-   (la première installation de PyTorch CPU est lourde). Au démarrage, la console doit afficher `Classifier loaded: mobilenet_v3_small-ep11-...`.
-   Sans modèle chargé, `MOCK=1` (PowerShell : `$env:MOCK="1"; uvicorn main:app --port 8000`) renvoie des résultats aléatoires marqués « démonstration ».
-3. **Backend** : `cd backend && copy .env.example .env` (renseignez `JWT_SECRET`, `GROQ_API_KEY`, `ADMIN_EMAILS`, SMTP) puis `npm i && npm run dev`
-4. **Frontend** : `cd frontend && copy .env.example .env.local && npm i && npm run dev` → http://localhost:3000
+Variables d'environnement : `MODEL_DIR`, `ONNX_VARIANT` (fp32, int8 ou fp16), `MIN_CONFIDENCE`, `MIN_MARGIN`, `MOCK`.
 
-Sans SMTP, les liens de confirmation et de réinitialisation s'affichent dans la console du backend.
+## 3. Application web et assistant
 
-## Le modèle
+- **Ingestion** : glisser-déposer, galerie d'exemples, photo par webcam, et **diagnostic en direct** (une image toutes les 0,7 s, étiquette superposée au flux vidéo, images/s, latences client, serveur et modèle).
+- **Résultat** :
+  - barres de probabilité animées et carte Grad-CAM ;
+  - **sévérité** (part de la feuille atteinte et masque des zones atteintes) ;
+  - détail des temps de réponse : navigateur, passerelle, FastAPI, prétraitement, inférence, Grad-CAM ;
+  - retour « diagnostic correct ? ».
+- **Page « Modèle IA & MLOps »** : métriques, comparaison baseline/MobileNet, tableau PyTorch/ONNX FP32/FP16/INT8, mesure de latence en direct depuis le navigateur, liens Swagger et MLflow.
+- **Assistant PHYTORA** (bulle flottante sur toutes les pages) :
+  - réponses affichées au fil de l'eau (SSE), en Markdown ;
+  - **réponses appuyées sur le guide des maladies (RAG)**, avec les sources citées ;
+  - prise en compte du diagnostic de l'utilisateur et de sa sévérité ;
+  - questions suggérées, envoi d'une photo dans le chat, dictée vocale ;
+  - historique des conversations dans MongoDB, notes 👍/👎 résumées dans l'administration.
 
-- MobileNetV3-Small affiné sur PlantVillage (38 classes, 54 284 images, split stratifié 70/15/15 après retrait des doublons exacts).
-- Test : exactitude 98,8 %, F1 macro 98,3 % (baseline CNN : 95,5 % / 94,2 %).
-- Classes les plus faibles : *Corn Cercospora/Gray leaf spot* (rappel 75 %, confondue 19 fois avec *Northern Leaf Blight*), *Tomato Target Spot* (confondue avec *Tomato healthy* 15 fois et avec *Spider mites* 9 fois).
-- **Limite majeure** : PlantVillage = feuilles isolées, fond uni, photos de laboratoire. Sur des photos prises au champ, la performance sera nettement plus basse, et le split aléatoire (sans regroupement par feuille) rend probablement le score de test optimiste. Mesurez le modèle sur vos propres photos avant de communiquer un chiffre.
-- Un classifieur répond toujours, même pour une photo qui n'est pas une feuille. Règle « incertain » : confiance < `MIN_CONFIDENCE` (0,60) ou écart entre les 2 premières hypothèses < `MIN_MARGIN` (0,10), réglables par variables d'environnement de `model-api`. Ces seuils sont des valeurs de départ, non calibrées : réglez-les avec des photos hors PlantVillage et des photos sans feuille.
-- La carte Grad-CAM montre où le modèle regarde (méthode du notebook partie 2).
-- Les retours « diagnostic correct ? » des utilisateurs sont enregistrés (collection `scans`) et résumés dans la page Administration : base d'un jeu de données de terrain.
+Développement sans Docker :
 
-## Sécurité et tests
+```bash
+cd gateway && cp .env.example .env && npm ci && npm run dev
+cd frontend && cp .env.example .env.local && npm ci && npm run dev
+```
 
-- `helmet`, limitation de débit (connexion, inscription, mot de passe oublié, analyses, chat), vérification du type réel de l'image (octets d'en-tête), taille max 8 Mo, validation des variables d'environnement au démarrage.
-- `cd backend && npm test` : tests unitaires (mot de passe, détection du type d'image, catalogue des 38 classes) et tests d'intégration (inscription, confirmation e-mail, isolation des analyses entre utilisateurs, accès admin, compte désactivé). Les tests d'intégration utilisent `mongodb-memory-server`, qui télécharge un binaire MongoDB au premier lancement.
+## 4. Qualité, tests et CI
 
-## Pas encore fait
+```bash
+pytest                                          # pipeline (12 tests) + API FastAPI (14 tests)
+flake8 src backend tests && black --check src backend tests
+cd gateway && npm run lint && npm test          # 15 tests (auth, isolation, proxy modèle, chatbot SSE)
+cd frontend && npm run lint && npm run build
+```
 
-« Mes cultures », détection de mauvaises herbes (aucun modèle), export PDF, pages de confidentialité / conditions, Docker Compose et CI, PWA, historique du chat.
+GitHub Actions :
+- `ci-tests.yml` : lint Python et vérification de `dvc.yaml`, pytest, lint et tests de la passerelle, lint et build du frontend ;
+- `docker-build.yml` : build des 3 images (multi-stage), puis `docker compose up` et vérification de bout en bout de l'API.
+
+## Remote DVC
+
+Le remote par défaut (`../phytora-dvc-storage`) est un dossier local. Pour partager les données et les poids dans l'équipe, configurez un remote commun :
+
+```bash
+dvc remote add -d -f storage gdrive://<id-du-dossier>            # ou s3://..., ou DagsHub
+dvc push
+```
+
+Si `dvc pull` ne trouve pas `models/legacy`, régénérez-le depuis l'historique Git (commit initial), puis relancez l'export :
+
+```bash
+mkdir -p models/legacy
+git show b94f93d:phytora/model-api/models/mobilenet_v3_small_best.pt > models/legacy/mobilenet_v3_small_best.pt
+git show b94f93d:phytora/model-api/models/metrics.json > models/legacy/metrics.json
+git show b94f93d:phytora/model-api/models/classes.json > models/legacy/classes.json
+python -m src.models.export --checkpoint models/legacy/mobilenet_v3_small_best.pt --out models/legacy --images data/raw/plantvillage/color --no-mlflow
+dvc add models/legacy && dvc push
+```

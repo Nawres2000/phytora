@@ -10,7 +10,7 @@ import { sha, newToken, issueVerification, isAdminEmail } from '../utils/tokens.
 const r = Router();
 const setCookie = (res, id) =>
   res.cookie('token', jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' }), {
-    httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 7 * 864e5,
+    httpOnly: true, sameSite: 'lax', secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === '1' : process.env.NODE_ENV === 'production', maxAge: 7 * 864e5,
   });
 export const pub = (u) => ({ id: u._id, name: u.name, email: u.email, role: u.role, avatar: u.avatar, pendingEmail: u.pendingEmail, createdAt: u.createdAt });
 

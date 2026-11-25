@@ -30,3 +30,7 @@
 
 :focus-visible { outline: 3px solid var(--color-phytora-warn); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* probability bars grow from 0 to their value when they appear */
+@keyframes barGrow { from { width: 0; } }
+.bar-grow { animation: barGrow 0.9s cubic-bezier(0.22, 1, 0.36, 1); transition: width 0.5s ease; }
