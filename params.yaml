@@ -1,0 +1,50 @@
+# Hyperparamètres du pipeline (lus par src/ et suivis par DVC + MLflow).
+# Modifier une valeur puis `dvc repro` relance seulement les étapes concernées.
+# Expérience ponctuelle : dvc exp run -S train.model=efficientnet_v2_s -S train.loss=focal
+seed: 42
+
+data:
+  raw_dir: data/raw/plantvillage/color   # dossier "color" du dataset Kaggle abdallahalidev/plantvillage-dataset
+  processed_dir: data/processed
+  val_size: 0.15
+  test_size: 0.15
+  group_near_duplicates: true   # même empreinte perceptuelle (dHash) => même split (anti-fuite)
+  quick_n: 0                    # > 0 : au plus N images par classe (essai rapide)
+
+train:
+  model: mobilenet_v3_small   # baseline_cnn | mobilenet_v3_small | efficientnet_v2_s | convnext_tiny
+  pretrained: true
+  img_size: 224
+  batch_size: 32
+  num_workers: 4
+  epochs_scratch: 8           # baseline_cnn (une seule phase, tout le réseau)
+  epochs_head: 2              # transfer learning, phase 1 : tête seule
+  epochs_finetune: 4          # transfer learning, phase 2 : derniers blocs dégelés
+  unfreeze_last: 3
+  lr_scratch: 1.0e-3
+  lr_head: 1.0e-3
+  lr_backbone: 1.0e-4
+  lr_finetune_head: 5.0e-4
+  weight_decay: 1.0e-4
+  scheduler: cosine           # cosine | none
+  loss: weighted_ce           # ce | weighted_ce | focal
+  focal_gamma: 2.0
+  label_smoothing: 0.0
+  mix: none                   # none | mixup | cutmix | both
+  mix_alpha: 0.4
+  mix_prob: 0.5
+  randaugment: false
+  freeze_bn: true
+  amp: true
+
+export:
+  opset: 17
+  int8: true                  # quantification statique INT8 (QDQ, calibrée sur des images de train)
+  fp16: true
+  calibration_images: 128
+  eval_images: 0              # 0 = tout le jeu de test pour comparer FP32 / INT8 / FP16
+  serve_variant: fp32         # variante servie par l'API : fp32 | int8 | fp16
+
+mlflow:
+  experiment: phytora-plantvillage
+  registered_model: phytora-classifier
