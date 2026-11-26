@@ -1,0 +1,74 @@
+# Alert rules (Prometheus UI > Alerts, and annotated on the Grafana dashboard).
+groups:
+  - name: phytora-system
+    rules:
+      - alert: ModelApiDown
+        expr: up{job="phytora-api"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "L'API du modèle ne répond plus"
+          description: "Prometheus n'arrive plus à lire /metrics depuis 1 minute."
+      - alert: ModelNotLoaded
+        expr: phytora_model_loaded == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Aucun modèle chargé"
+          description: "L'API répond 503 sur /predict (fichiers du modèle absents ?)."
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(phytora_http_request_duration_seconds_bucket{route="/predict"}[5m])) by (le)) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Latence p95 de /predict > 1 s"
+          description: "p95 = {{ $value | humanizeDuration }} sur 5 minutes."
+      - alert: HighErrorRate
+        expr: >
+          sum(rate(phytora_http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(phytora_http_requests_total[5m])), 1e-9) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Plus de 5 % d'erreurs serveur"
+          description: "Taux d'erreurs 5xx : {{ $value | humanizePercentage }}."
+      - alert: HighMemory
+        expr: process_resident_memory_bytes{job="phytora-api"} > 3e9
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Mémoire de l'API > 3 Go"
+
+  - name: phytora-model
+    rules:
+      - alert: LowMeanConfidence
+        expr: >
+          sum(rate(phytora_prediction_confidence_sum[30m]))
+          / clamp_min(sum(rate(phytora_prediction_confidence_count[30m])), 1e-9) < 0.7
+          and sum(rate(phytora_prediction_confidence_count[30m])) > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Confiance moyenne < 70 % sur 30 minutes"
+          description: "Les photos reçues ressemblent peu aux données d'entraînement (dérive probable)."
+      - alert: HighUncertainRate
+        expr: >
+          sum(rate(phytora_uncertain_predictions_total[30m]))
+          / clamp_min(sum(rate(phytora_prediction_confidence_count[30m])), 1e-9) > 0.3
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Plus de 30 % de prédictions incertaines"
+      - alert: DataDriftDetected
+        expr: phytora_drift_detected == 1
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "Dérive des données ou des prédictions détectée"
+          description: "Part des colonnes en dérive : {{ with query \"phytora_data_drift_share\" }}{{ . | first | value | humanizePercentage }}{{ end }}. Le flow Prefect de réentraînement est déclenché."
+      - alert: DriftCheckStale
+        expr: phytora_drift_check_age_seconds > 2 * 86400
+        for: 30m
+        labels: { severity: info }
+        annotations:
+          summary: "Aucun contrôle de dérive depuis plus de 2 jours"

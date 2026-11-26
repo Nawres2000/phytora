@@ -1,5 +1,5 @@
 # Model API (FastAPI + ONNX Runtime). PyTorch CPU is only needed for Grad-CAM / Score-CAM.
-fastapi==0.165.0
+fastapi==0.150.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
 pydantic==2.13.5
@@ -7,3 +7,4 @@ pillow==13.0.0
 numpy==2.5.3
 onnxruntime==1.29.0
 pyyaml==6.0.3
+prometheus-client==0.26.0

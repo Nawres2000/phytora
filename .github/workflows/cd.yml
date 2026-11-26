@@ -1,0 +1,132 @@
+name: CD - release, staging, production
+
+# Build once, deploy many: images are built from the commit that passed CI, pushed to GHCR with an
+# immutable SHA tag, deployed and smoke-tested in "staging", then promoted to "production" by retagging
+# the SAME images (no rebuild). If production fails its smoke test, the previous production images are
+# restored (rollback). Add required reviewers on the "production" environment (Settings > Environments)
+# to turn the promotion into a manual approval.
+on:
+  workflow_run:
+    workflows: ["CI - lint & tests"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  SERVICES: "backend gateway frontend"
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.vars.outputs.registry }}
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: vars
+        run: |
+          echo "registry=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/phytora" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push (immutable SHA tag + staging tag)
+        run: |
+          set -e
+          build() { docker buildx build --push --cache-from type=gha,scope=$1 --cache-to type=gha,mode=max,scope=$1 \
+                      -t ${{ steps.vars.outputs.registry }}-$1:${{ steps.vars.outputs.tag }} \
+                      -t ${{ steps.vars.outputs.registry }}-$1:staging "${@:2}"; }
+          build backend -f backend/Dockerfile .
+          build gateway gateway
+          build frontend frontend
+
+  deploy-staging:
+    needs: release
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: http://localhost:3000
+    env:
+      REGISTRY: ${{ needs.release.outputs.registry }}
+      TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch model weights from DVC (real model if the DagsHub secrets exist, mock otherwise)
+        env:
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          if [ -n "$DAGSHUB_TOKEN" ]; then
+            pip install -q "dvc[s3]==3.67.1"
+            dvc remote modify origin --local access_key_id "$DAGSHUB_TOKEN"
+            dvc remote modify origin --local secret_access_key "$DAGSHUB_TOKEN"
+            dvc pull models/legacy.dvc && echo "MOCK=0" >> "$GITHUB_ENV"
+          else
+            echo "::notice::DAGSHUB_TOKEN secret not set: staging runs the API in mock mode"
+            echo "MOCK=1" >> "$GITHUB_ENV"
+          fi
+      - name: Deploy the released images
+        run: |
+          docker compose pull backend gateway frontend
+          docker compose up -d --no-build mongo backend gateway frontend
+      - name: Smoke test
+        run: scripts/smoke_test.sh || (docker compose logs backend gateway; exit 1)
+
+  promote-production:
+    needs: [release, deploy-staging]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    env:
+      REGISTRY: ${{ needs.release.outputs.registry }}
+      TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remember the current production images (rollback point)
+        run: |
+          for s in $SERVICES; do
+            d=$(docker buildx imagetools inspect $REGISTRY-$s:prod --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)
+            echo "PREV_$s=$d" >> "$GITHUB_ENV"; echo "$s previous prod digest: ${d:-none}"
+          done
+      - name: Promote (retag the tested images, no rebuild)
+        run: |
+          for s in $SERVICES; do
+            docker buildx imagetools create -t $REGISTRY-$s:prod -t $REGISTRY-$s:latest $REGISTRY-$s:$TAG
+          done
+      - name: Production smoke test
+        id: smoke
+        run: |
+          TAG=prod MOCK=1 docker compose pull backend gateway frontend
+          TAG=prod MOCK=1 docker compose up -d --no-build mongo backend gateway frontend
+          scripts/smoke_test.sh
+      - name: Rollback production images
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          for s in $SERVICES; do
+            prev=$(printenv PREV_$s || true)
+            if [ -n "$prev" ]; then docker buildx imagetools create -t $REGISTRY-$s:prod $REGISTRY-$s@$prev && echo "$s rolled back to $prev"; fi
+          done

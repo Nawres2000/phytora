@@ -13,5 +13,13 @@ mlartifacts/
 *.pt
 *.pth
 *.onnx
-/data/raw/*
-!/data/raw/.gitkeep
+# runtime monitoring data (predictions log, drift reports are regenerated)
+/logs/*
+!/logs/.gitkeep
+/reports/monitoring/drift_report.html
+/reports/monitoring/drift_history.jsonl
+/reports/monitoring/alerts.jsonl
+/reports/pipeline_status.json
+/data/incoming/*
+/data/quarantine/*
+/deploy/history.log

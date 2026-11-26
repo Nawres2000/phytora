@@ -104,13 +104,16 @@ r.post('/', async (req, res) => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
       signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60000)]),
       body: JSON.stringify({
-        model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+        model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
         messages: [{ role: 'system', content: SYSTEM + describeScan(scan) + contextBlock(docs) }, ...history, { role: 'user', content: text }],
         temperature: 0.4,
         stream: true,
       }),
     });
-    if (!resp.ok || !resp.body) throw new Error(`LLM HTTP ${resp.status}`);
+    if (!resp.ok || !resp.body) {
+      const detail = await resp.text().catch(() => '');
+      throw new Error(`LLM HTTP ${resp.status} ${detail.slice(0, 300)}`); // e.g. "model ... has been decommissioned"
+    }
     const decoder = new TextDecoder();
     let buffer = '';
     for await (const chunk of resp.body) {

@@ -48,3 +48,14 @@ export:
 mlflow:
   experiment: phytora-plantvillage
   registered_model: phytora-classifier
+
+monitoring:
+  reference_images: 500          # validation images profiled as the drift reference
+  window_size: 500               # last N production predictions compared with the reference
+  min_samples: 30                # below this, no drift verdict
+  drift_share: 0.3               # dataset drift if >= 30 % of the monitored columns drifted
+  max_confidence_drop: 0.10      # prediction drift if mean confidence drops by more than 10 points
+  max_uncertain_increase: 0.15   # ... or if the uncertain rate rises by more than 15 points
+
+pipeline:
+  min_test_macro_f1: 0.90        # quality gate: a model below this is never registered for production

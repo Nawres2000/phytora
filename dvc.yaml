@@ -79,3 +79,20 @@ stages:
     metrics:
       - reports/export.json:
           cache: false
+
+  reference:
+    cmd: python -m src.monitoring.reference
+    deps:
+      - src/monitoring/reference.py
+      - src/monitoring/features.py
+      - models/model.onnx
+      - models/metadata.json
+      - data/processed
+    params:
+      - monitoring.reference_images
+    outs:
+      - reports/monitoring/reference.csv:
+          cache: false
+    metrics:
+      - reports/monitoring/reference.json:
+          cache: false
