@@ -14,3 +14,11 @@ onnxscript==0.7.2
 onnxruntime==1.29.0
 tabulate==0.10.0
 kagglehub
+# orchestration + monitoring
+prefect==3.9.5
+evidently==0.7.23
+httpx==0.28.1
+prometheus-client==0.26.0
+# the drift reference stage runs the exported model like the API does
+fastapi==0.150.0
+python-multipart==0.0.32

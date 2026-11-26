@@ -164,3 +164,69 @@ def test_real_onnx_model_if_available():
     out = svc.predict(Image.new("RGB", (300, 200), (40, 150, 40)), 3)
     assert len(out["top_k"]) == 3 and abs(sum(c["score"] for c in out["top_k"])) <= 1.0001
     assert out["top_k"][0]["class_id"] in svc.classes
+
+
+# ---------------------------------------------------------------- monitoring
+def test_metrics_endpoint_exposes_system_and_model_metrics(client):
+    client.post("/predict", files=upload())
+    body = client.get("/metrics").text
+    assert 'phytora_http_requests_total{method="POST",route="/predict",status="200"}' in body
+    assert "phytora_http_request_duration_seconds_bucket" in body
+    assert 'phytora_predictions_total{class_id="Tomato___Late_blight",healthy="false"}' in body
+    assert "phytora_prediction_confidence_bucket" in body and "phytora_inference_duration_seconds" in body
+    assert "process_resident_memory_bytes" in body or "python_info" in body
+
+
+def test_prediction_is_logged_as_json_with_drift_features(client):
+    import json
+
+    from backend.app import monitoring
+
+    before = monitoring.LOG_PATH.read_text().count("\n") if monitoring.LOG_PATH.exists() else 0
+    client.post("/predict", files=upload())
+    lines = monitoring.LOG_PATH.read_text().splitlines()
+    assert len(lines) == before + 1
+    rec = json.loads(lines[-1])
+    assert rec["event"] == "prediction" and rec["pred_class"] == "Tomato___Late_blight"
+    for key in ("brightness", "contrast", "saturation", "green_ratio", "sharpness", "leaf_coverage", "latency_ms", "margin"):
+        assert key in rec
+
+
+def test_drift_endpoint_and_gauge(client):
+    import json
+
+    from backend.app import monitoring
+
+    assert client.get("/monitoring/drift").json()["status"] in ("never_checked", "ok", "drift", "insufficient_data")
+    monitoring.DRIFT_SUMMARY.write_text(
+        json.dumps(
+            {
+                "status": "drift",
+                "drift_share": 0.5,
+                "checked_at": "2026-01-01T00:00:00+00:00",
+                "mean_confidence": {"reference": 0.9, "current": 0.7},
+            }
+        )
+    )
+    assert client.get("/monitoring/drift").json()["drift_share"] == 0.5
+    body = client.get("/metrics").text
+    assert "phytora_drift_detected 1.0" in body and "phytora_data_drift_share 0.5" in body
+
+
+def test_latency_budget(client):
+    """Integration latency check: the API overhead around the model stays small."""
+    import time
+
+    t0 = time.perf_counter()
+    r = client.post("/predict", files=upload())
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert r.status_code == 200 and r.json()["latency_ms"] < 1000 and elapsed_ms < 2000
+
+
+def test_admin_reload_requires_token(client, monkeypatch):
+    assert client.post("/admin/reload").status_code == 403
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
+    assert client.post("/admin/reload", headers={"X-Admin-Token": "wrong"}).status_code == 403
+    monkeypatch.setenv("MOCK", "1")
+    r = client.post("/admin/reload", headers={"X-Admin-Token": "secret"})
+    assert r.status_code == 200 and r.json()["version"] == "mock"

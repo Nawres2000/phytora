@@ -1,0 +1,90 @@
+name: CT - continuous training
+
+# Retrains, evaluates and registers a model automatically when:
+#  - new data is versioned (a *.dvc file under data/ changes on main),
+#  - drift is detected (the Prefect monitoring flow sends a `retrain` repository_dispatch),
+#  - every Monday (scheduled refresh), or on demand (Actions > Run workflow).
+# The quality gate (pipeline.min_test_macro_f1) and the MLflow promotion rule (better than production)
+# protect production. GitHub runners have no GPU: the run uses `quick_n` images per class; full-scale
+# training runs on the Prefect trainer / a GPU machine with the same pipeline.
+on:
+  push:
+    branches: [main]
+    paths: ["data/**/*.dvc"]
+  repository_dispatch:
+    types: [retrain]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      quick_n:
+        description: "Images per class (0 = full dataset)"
+        default: "100"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+      QUICK_N: ${{ github.event.inputs.quick_n || '100' }}
+      REASON: ${{ github.event.client_payload.reason || github.event_name }}
+    steps:
+      - name: Secrets check
+        id: secrets
+        run: |
+          if [ -z "$DAGSHUB_TOKEN" ]; then
+            echo "::warning::DAGSHUB_TOKEN secret missing: cannot pull the dataset, continuous training skipped."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ok == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.secrets.outputs.ok == 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        if: steps.secrets.outputs.ok == 'true'
+        run: pip install -r requirements-train.txt
+      - name: Pull data
+        if: steps.secrets.outputs.ok == 'true'
+        run: |
+          dvc remote modify origin --local access_key_id "$DAGSHUB_TOKEN"
+          dvc remote modify origin --local secret_access_key "$DAGSHUB_TOKEN"
+          dvc pull
+      - name: Retrain (DVC experiment) - reason ${{ env.REASON }}
+        if: steps.secrets.outputs.ok == 'true'
+        run: |
+          dvc exp run -S data.quick_n=$QUICK_N -S train.num_workers=2
+          dvc metrics show
+      - name: Push artefacts
+        if: steps.secrets.outputs.ok == 'true'
+        run: dvc push
+      - uses: actions/upload-artifact@v4
+        if: steps.secrets.outputs.ok == 'true'
+        with:
+          name: ct-reports
+          path: reports/
+      - name: Open a pull request with the new model version (dvc.lock + metrics)
+        if: steps.secrets.outputs.ok == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: ct/retrain-${{ github.run_id }}
+          title: "CT: retrained model (${{ env.REASON }})"
+          body: |
+            Automatic retraining triggered by **${{ env.REASON }}** (quick_n=${{ env.QUICK_N }}).
+            Metrics are in `reports/metrics.json`; the model is registered in MLflow (staging, promoted only if better).
+          commit-message: "CT: retrain model (${{ env.REASON }})"
+          add-paths: |
+            dvc.lock
+            reports/*.json

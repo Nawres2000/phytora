@@ -1,8 +1,13 @@
 # Whole platform in one command:  docker compose up --build
-#   web app  http://localhost:3000   | gateway  http://localhost:5000/health
-#   FastAPI  http://localhost:8000/docs (Swagger) | MLflow http://localhost:5001
-# Model files come from DVC (`dvc pull`) and are mounted read-only into the API.
+#   web app     http://localhost:3000        gateway     http://localhost:5000/health
+#   FastAPI     http://localhost:8000/docs   metrics     http://localhost:8000/metrics
+#   MLflow      http://localhost:5001        Prefect UI  http://localhost:4200
+#   Prometheus  http://localhost:9090        Grafana     http://localhost:3001  (admin / admin)
+# Model files come from DVC (`dvc pull`). The API serves models/ (last trained model) when it exists,
+# else models/legacy. Predictions are logged to the `prediction-logs` volume, drift reports to ./reports/monitoring.
 name: phytora
+
+x-admin-token: &admin_token ${ADMIN_TOKEN:-change-me-admin-token}
 
 services:
   mongo:
@@ -16,6 +21,7 @@ services:
       timeout: 5s
       retries: 10
 
+  # ---------------------------------------------------------------- experiment tracking + registry
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.18.0
     restart: unless-stopped
@@ -29,25 +35,33 @@ services:
     volumes:
       - mlflow-data:/mlflow
 
+  # ---------------------------------------------------------------- serving
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    image: ${REGISTRY:-phytora}-backend:${TAG:-latest}
     restart: unless-stopped
     environment:
-      MODEL_DIR: ${MODEL_DIR:-/app/models/legacy}
+      MODEL_DIR: ${MODEL_DIR:-}
       ONNX_VARIANT: ${ONNX_VARIANT:-}
       MIN_CONFIDENCE: ${MIN_CONFIDENCE:-0.60}
       MIN_MARGIN: ${MIN_MARGIN:-0.10}
       MOCK: ${MOCK:-0}
       CORS_ORIGINS: http://localhost:3000
+      ADMIN_TOKEN: *admin_token
+      PREDICTION_LOG: /app/logs/predictions.jsonl
+      DRIFT_SUMMARY: /app/reports/monitoring/drift_summary.json
     volumes:
       - ./models:/app/models:ro
+      - prediction-logs:/app/logs      # written by the API, read by the drift check (trainer)
+      - ./reports:/app/reports:ro
     ports:
       - "8000:8000"
 
   gateway:
     build: ./gateway
+    image: ${REGISTRY:-phytora}-gateway:${TAG:-latest}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -74,12 +88,93 @@ services:
         NEXT_PUBLIC_API_URL: http://localhost:5000/api
         NEXT_PUBLIC_MODEL_API_URL: http://localhost:8000
         NEXT_PUBLIC_MLFLOW_URL: http://localhost:5001
+    image: ${REGISTRY:-phytora}-frontend:${TAG:-latest}
     restart: unless-stopped
     depends_on:
       - gateway
     ports:
       - "3000:3000"
 
+  # ---------------------------------------------------------------- orchestration (Prefect)
+  prefect-server:
+    build:
+      context: .
+      dockerfile: docker/train.Dockerfile
+    image: phytora-trainer:latest
+    restart: unless-stopped
+    command: prefect server start --host 0.0.0.0 --port 4200
+    environment:
+      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+    volumes:
+      - prefect-data:/root/.prefect
+    ports:
+      - "4200:4200"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4200/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  trainer:
+    image: phytora-trainer:latest
+    restart: unless-stopped
+    command: python -m src.pipelines.serve
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_API_URL: http://backend:8000
+      ADMIN_TOKEN: *admin_token
+      PREDICTION_LOG: /app/logs/predictions.jsonl
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-}
+    volumes:
+      - .:/app   # the Git + DVC work tree: flows run `dvc repro`, `dvc push`
+      - prediction-logs:/app/logs
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+
+  # ---------------------------------------------------------------- monitoring
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/phytora.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
 volumes:
+  prediction-logs:
   mongo-data:
   mlflow-data:
+  prefect-data:
+  prometheus-data:
+  grafana-data:

@@ -1,16 +1,25 @@
 # PHYTORA : diagnostic des maladies foliaires, de l'entraînement à la production
 
-**Projet de module Deep Learning Avancé, Axe 1 (CNN & Transfer Learning).** Classification de 38 maladies foliaires (PlantVillage) avec un MobileNetV3 affiné. Le projet couvre tout le cycle MLOps :
-- données versionnées avec DVC, entraînements suivis dans MLflow ;
+**Projets de modules Deep Learning Avancé (Axe 1, CNN & Transfer Learning) et MLOps.** Classification de 38 maladies foliaires (PlantVillage) avec un MobileNetV3 affiné. Le projet couvre tout le cycle MLOps :
+- données et modèles versionnés avec DVC (remote DagsHub), entraînements suivis dans MLflow, avec Model Registry ;
+- orchestration **Prefect** : réentraînement planifié, ingestion de données, gestion des erreurs et rollback ;
 - export ONNX, puis quantification INT8 et FP16 ;
 - API FastAPI typée, application web Next.js avec un assistant agronomique ;
-- Docker Compose et CI GitHub Actions.
+- **monitoring** : métriques Prometheus, tableau de bord Grafana, alertes, dérive mesurée avec Evidently ;
+- CI, **CD** (GHCR, staging, prod, rollback) et **CT** (réentraînement automatique) avec GitHub Actions.
+
+Documentation : [guide de déploiement](docs/DEPLOYMENT.md) · [rapport de monitoring](docs/MONITORING.md) · [plan de la validation MLOps](docs/VALIDATION.md)
 
 ```
 Navigateur ──HTTP──▶ Frontend Next.js (3000) ──JSON──▶ Passerelle Express (5000) ──multipart──▶ API FastAPI (8000) ──▶ ONNX Runtime
                                                   │  comptes, historique, chatbot RAG                 │  /docs Swagger
                                                   └──▶ MongoDB                                         └──▶ PyTorch (Grad-CAM)
-DVC (données + poids) ──▶ src/ (prepare → train → evaluate → export) ──▶ MLflow (runs + Model Registry, 5001)
+DVC (données + poids) ──▶ src/ (prepare → train → evaluate → export → reference) ──▶ MLflow (runs + Model Registry, 5001)
+        ▲                               ▲ orchestré par Prefect (4200) : training-pipeline · monitoring-check · ingest-new-data
+        │                               │
+   data/incoming            logs JSON des prédictions ──▶ dérive Evidently ──▶ réentraînement (CT)
+API /metrics ──▶ Prometheus (9090, alertes) ──▶ Grafana (3001)
+GitHub Actions : CI (lint, tests) ──▶ CD (GHCR → staging → prod, rollback) · CT (dvc exp run sur nouvelles données / dérive)
 ```
 
 ## Démarrage en une commande
@@ -26,6 +35,9 @@ docker compose up --build
 | Application web | http://localhost:3000 |
 | API FastAPI (Swagger) | http://localhost:8000/docs |
 | MLflow (runs, registre) | http://localhost:5001 |
+| Prefect (flows, exécutions) | http://localhost:4200 |
+| Prometheus (métriques, alertes) | http://localhost:9090 |
+| Grafana (tableau de bord, admin / admin) | http://localhost:3001 |
 | Passerelle (santé) | http://localhost:5000/health |
 
 Sans poids du modèle, `MOCK=1 docker compose up --build` sert des prédictions aléatoires bien formées, marquées « démonstration ». C'est ce mode qu'utilise la CI.
@@ -39,9 +51,15 @@ src/                 code Deep Learning et MLOps
   data/              download.py, prepare.py (anti-fuite), dataset.py, augment.py (MixUp/CutMix)
   models/            architecture.py, losses.py (Focal), train.py (MLflow), evaluate.py, export.py (ONNX/INT8/FP16 + registre), compare.py
   utils/             gradcam.py (Grad-CAM, Score-CAM), severity.py, common.py
+  monitoring/        features.py (descripteurs d'image), reference.py, drift.py (Evidently)
+  pipelines/         flows.py (flows Prefect), serve.py (déploiements planifiés)
 backend/             API FastAPI : app/main.py (routes), app/schemas.py (Pydantic), app/inference.py (ONNX Runtime), tests/, Dockerfile
 gateway/             Express + MongoDB : comptes, historique, retours utilisateurs, chatbot (streaming SSE + RAG), administration
 notebooks/           notebooks Kaggle d'origine (entraînement baseline/MobileNet, Grad-CAM + ONNX), portés dans src/
+configs/             prometheus/ (scrape + alertes), grafana/ (datasource + dashboard provisionnés)
+docker/              train.Dockerfile (entraînement + Prefect)
+docs/                déploiement, monitoring, plan de validation
+scripts/             smoke_test.sh, deploy.sh, rollback.sh
 frontend/            Next.js + Tailwind : dépôt d'image, webcam en direct, Grad-CAM, sévérité, latences, page Modèle, assistant
 models/              legacy.dvc (modèle actuel) + sorties du pipeline (model.pt, model*.onnx, metadata.json)
 tests/               tests unitaires du pipeline (pytest)
@@ -149,10 +167,21 @@ cd gateway && cp .env.example .env && npm ci && npm run dev
 cd frontend && cp .env.example .env.local && npm ci && npm run dev
 ```
 
-## 4. Qualité, tests et CI
+## 4. Orchestration, monitoring, CD et CT (module MLOps)
+
+| Brique | Fichiers | Ce qui est en place |
+|---|---|---|
+| Orchestration Prefect | `src/pipelines/flows.py`, `serve.py`, `docker/train.Dockerfile` | 3 flows planifiés (entraînement le lundi, dérive toutes les 6 h, ingestion toutes les 30 min). Retries avec backoff et timeouts, fail-fast sur les erreurs déterministes, quality gate, **rollback** des artefacts, hooks d'alerte. |
+| Monitoring | `backend/app/monitoring.py`, `src/monitoring/`, `configs/prometheus`, `configs/grafana` | `/metrics` (système et modèle), log JSON de chaque prédiction, dérive Evidently (descripteurs d'image, confiance, classes), 9 alertes Prometheus, tableau de bord Grafana provisionné |
+| CD | `.github/workflows/cd.yml`, `scripts/deploy.sh`, `scripts/rollback.sh`, `scripts/smoke_test.sh` | images construites une fois, poussées sur GHCR (tag SHA), staging puis promotion en prod par retag, rollback automatique |
+| CT | `.github/workflows/ct.yml`, flow `monitoring-check` | réentraînement sur nouvelles données, dérive, planification ou à la demande ; PR avec le nouveau `dvc.lock` |
+
+Détails dans [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) et [docs/MONITORING.md](docs/MONITORING.md).
+
+## 5. Qualité, tests et CI
 
 ```bash
-pytest                                          # pipeline (12 tests) + API FastAPI (14 tests)
+pytest                                          # pipeline, monitoring, flows Prefect (23 tests) + API (19 tests)
 flake8 src backend tests && black --check src backend tests
 cd gateway && npm run lint && npm test          # 15 tests (auth, isolation, proxy modèle, chatbot SSE)
 cd frontend && npm run lint && npm run build
@@ -160,7 +189,8 @@ cd frontend && npm run lint && npm run build
 
 GitHub Actions :
 - `ci-tests.yml` : lint Python et vérification de `dvc.yaml`, pytest, lint et tests de la passerelle, lint et build du frontend ;
-- `docker-build.yml` : build des 3 images (multi-stage), puis `docker compose up` et vérification de bout en bout de l'API.
+- `docker-build.yml` : build des 4 images (multi-stage), puis `docker compose up` et vérification de bout en bout : API, MLflow, Prefect (déploiements enregistrés), Prometheus (cible et règles), Grafana (tableau de bord) ;
+- `cd.yml` et `ct.yml` : voir la section 4.
 
 ## Remote DVC
 

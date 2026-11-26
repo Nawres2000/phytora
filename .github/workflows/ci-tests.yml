@@ -38,8 +38,8 @@ jobs:
       - name: Install (CPU PyTorch)
         run: |
           pip install -r backend/requirements.txt -r backend/requirements-explain.txt
-          pip install -r requirements-dev.txt scikit-learn==1.9.1 pandas==3.0.5 matplotlib==3.11.2
-      - run: pytest -v --junitxml=pytest-report.xml
+          pip install -r requirements-dev.txt scikit-learn==1.9.1 pandas==3.0.5 matplotlib==3.11.2 prefect==3.9.5 evidently==0.7.23
+      - run: pytest -v --junitxml=pytest-report.xml -W ignore::SyntaxWarning
       - uses: actions/upload-artifact@v4
         if: always()
         with:

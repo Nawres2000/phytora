@@ -12,15 +12,17 @@ RUN pip install -r /tmp/requirements.txt \
 
 # Stage 2: slim runtime, non-root user, only the code the API imports
 FROM python:3.13-slim AS runtime
-ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 MODEL_DIR=/app/models/legacy
+ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 RUN useradd --create-home --uid 1001 app
 COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY src/__init__.py src/
 COPY src/utils src/utils
+COPY src/monitoring/__init__.py src/monitoring/features.py src/monitoring/
 COPY src/models/__init__.py src/models/architecture.py src/models/checkpoint.py src/models/
 COPY backend/__init__.py backend/
 COPY backend/app backend/app
+RUN mkdir -p /app/logs && chown app /app/logs  # prediction log, on a named volume shared with the trainer
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \

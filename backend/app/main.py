@@ -6,24 +6,29 @@ Endpoints
 - POST /predict            image -> top-k diagnosis (+ severity, + optional Grad-CAM heat map)
 - POST /predict/visualize  image -> annotated PNG (Grad-CAM, Score-CAM or severity mask)
 - POST /predict/batch      several images in one call
+- GET  /metrics            Prometheus metrics (system + model + drift)
+- GET  /monitoring/drift   last data / prediction drift check
+- POST /admin/reload       reload the model after a promotion (X-Admin-Token header)
 
 Run from the repository root: uvicorn backend.app.main:app --port 8000
-Env: MODEL_DIR, ONNX_VARIANT (fp32|int8|fp16), MIN_CONFIDENCE, MIN_MARGIN, MOCK=1, CORS_ORIGINS
+Env: MODEL_DIR, ONNX_VARIANT (fp32|int8|fp16), MIN_CONFIDENCE, MIN_MARGIN, MOCK=1, CORS_ORIGINS,
+     PREDICTION_LOG, DRIFT_SUMMARY, ADMIN_TOKEN
 """
 
+import json
 import os
 import time
 from contextlib import asynccontextmanager
 from io import BytesIO
 from typing import Annotated, Literal, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from backend.app import inference
+from backend.app import inference, monitoring
 from backend.app.schemas import (
     BatchItem,
     BatchResponse,
@@ -32,6 +37,7 @@ from backend.app.schemas import (
     MetadataResponse,
     PredictionResponse,
 )
+from src.monitoring.features import image_stats
 from src.utils.gradcam import overlay, to_bytes, to_data_url
 from src.utils.severity import estimate_severity, severity_overlay
 
@@ -56,6 +62,14 @@ def load_service(state: dict) -> None:
         state["service"] = None
         state["error"] = f"{type(e).__name__}: {e}"
         print("Model NOT loaded ->", state["error"])
+    monitoring.set_model(state["service"])
+    monitoring.log_event(
+        {
+            "event": "model_loaded" if state["service"] else "model_load_failed",
+            "version": getattr(state["service"], "version", None),
+            "error": state["error"],
+        }
+    )
 
 
 @asynccontextmanager
@@ -80,6 +94,23 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Class-Id", "X-Confidence", "X-Latency-Ms", "X-Severity-Percent"],
 )
+
+
+@app.middleware("http")
+async def http_metrics(request: Request, call_next):
+    """Prometheus request count / latency per route template (not per raw URL: bounded cardinality)."""
+    t0 = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        path = getattr(route, "path", "unmatched")
+        if path != "/metrics":
+            monitoring.REQUESTS.labels(request.method, path, str(status)).inc()
+            monitoring.LATENCY.labels(path).observe(time.perf_counter() - t0)
 
 
 def get_service(request: Request):
@@ -109,7 +140,7 @@ async def read_image(file: UploadFile) -> Image.Image:
         raise HTTPException(status_code=400, detail="Image illisible ou corrompue.")
 
 
-def run_prediction(service, image, top_k: int, explain: bool, method: str, with_severity: bool) -> dict:
+def run_prediction(service, image, top_k: int, explain: bool, method: str, with_severity: bool, route: str = "/predict") -> dict:
     t0 = time.perf_counter()
     out = service.predict(image, top_k)
     top = [{**c, **inference.describe(c["class_id"])} for c in out["top_k"]]
@@ -144,6 +175,7 @@ def run_prediction(service, image, top_k: int, explain: bool, method: str, with_
         "total_ms": round(total, 2),
     }
     result["latency_ms"] = round(total, 2)
+    monitoring.record_prediction(result, image_stats(image), route)  # metrics + JSON log (drift input)
     return result
 
 
@@ -257,8 +289,37 @@ async def predict_batch(service: Service, files: list[UploadFile] = File(...), t
     for f in files:
         try:
             image = await read_image(f)
-            pred = await run_in_threadpool(run_prediction, service, image, top_k, False, "gradcam", True)
+            pred = await run_in_threadpool(run_prediction, service, image, top_k, False, "gradcam", True, "/predict/batch")
             items.append(BatchItem(filename=f.filename, prediction=pred))
         except HTTPException as e:
             items.append(BatchItem(filename=f.filename, error=e.detail))
     return BatchResponse(count=len(items), items=items, latency_ms=round((time.perf_counter() - t0) * 1000, 2))
+
+
+@app.get("/metrics", tags=["monitoring"], summary="Métriques Prometheus (système, modèle, dérive)", response_class=Response)
+async def metrics():
+    body, ctype = monitoring.metrics_payload()
+    return Response(content=body, media_type=ctype)
+
+
+@app.get("/monitoring/drift", tags=["monitoring"], summary="Résultat du dernier contrôle de dérive (Evidently)")
+async def drift():
+    try:
+        return json.loads(monitoring.DRIFT_SUMMARY.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"status": "never_checked", "message": "Aucun contrôle de dérive encore exécuté (flow Prefect monitoring)."}
+
+
+@app.post("/admin/reload", tags=["service"], summary="Recharger le modèle (après une promotion en production)")
+async def reload_model(request: Request, x_admin_token: Optional[str] = Header(None)):
+    expected = os.getenv("ADMIN_TOKEN")
+    if not expected or x_admin_token != expected:
+        raise HTTPException(status_code=403, detail="Jeton d'administration invalide ou rechargement désactivé.")
+    previous = getattr(request.app.state.model.get("service"), "version", None)
+    new_state: dict = {}
+    await run_in_threadpool(load_service, new_state)
+    if new_state.get("service") is None:  # keep serving the previous model: automatic rollback
+        monitoring.set_model(request.app.state.model.get("service"))
+        raise HTTPException(status_code=500, detail=f"Rechargement échoué, modèle précédent conservé : {new_state.get('error')}")
+    request.app.state.model = new_state
+    return {"reloaded": True, "previous_version": previous, "version": new_state["service"].version}
