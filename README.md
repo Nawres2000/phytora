@@ -91,7 +91,14 @@ dvc exp run -S train.loss=focal -S train.mix=cutmix -S train.randaugment=true
 python -m src.models.compare         # → reports/comparison.md
 ```
 
-Sur GPU Kaggle ou Colab, définissez `MLFLOW_TRACKING_URI` vers votre serveur MLflow (par exemple DagsHub) pour retrouver les runs ensuite.
+Sur GPU, utilisez [`notebooks/03_kaggle_gpu_training.ipynb`](notebooks/03_kaggle_gpu_training.ipynb) : il lance la grille d'expériences, la validation croisée et le pipeline complet sur le dataset entier, et journalise tout dans le MLflow hébergé par DagsHub (`https://dagshub.com/Nawres2000/phytora.mlflow`).
+
+Grille d'expériences et validation croisée en une commande (ou depuis l'interface Prefect) :
+
+```bash
+python -m src.pipelines.experiments                   # 4 configurations, quick_n=50 → reports/experiments.md
+python -m src.models.cross_validate --folds 3 --quick-n 50   # → reports/cross_validation.json
+```
 
 | Étape | Contenu |
 |---|---|
@@ -171,7 +178,7 @@ cd frontend && cp .env.example .env.local && npm ci && npm run dev
 
 | Brique | Fichiers | Ce qui est en place |
 |---|---|---|
-| Orchestration Prefect | `src/pipelines/flows.py`, `serve.py`, `docker/train.Dockerfile` | 3 flows planifiés (entraînement le lundi, dérive toutes les 6 h, ingestion toutes les 30 min). Retries avec backoff et timeouts, fail-fast sur les erreurs déterministes, quality gate, **rollback** des artefacts, hooks d'alerte. |
+| Orchestration Prefect | `src/pipelines/flows.py`, `experiments.py`, `serve.py`, `docker/train.Dockerfile` | 3 flows planifiés (entraînement le lundi, dérive toutes les 6 h, ingestion toutes les 30 min) et 2 flows à la demande : **grille d'expériences** (baseline, MobileNet, ablation Focal/CutMix/RandAugment, EfficientNet ; chaque config = `dvc exp run --temp` = 1 run MLflow + 1 version du Registry) et **validation croisée** (k-fold stratifié et groupé). Retries avec backoff et timeouts, fail-fast sur les erreurs déterministes, quality gate, **rollback** des artefacts, hooks d'alerte. |
 | Monitoring | `backend/app/monitoring.py`, `src/monitoring/`, `configs/prometheus`, `configs/grafana` | `/metrics` (système et modèle), log JSON de chaque prédiction, dérive Evidently (descripteurs d'image, confiance, classes), 9 alertes Prometheus, tableau de bord Grafana provisionné |
 | CD | `.github/workflows/cd.yml`, `scripts/deploy.sh`, `scripts/rollback.sh`, `scripts/smoke_test.sh` | images construites une fois, poussées sur GHCR (tag SHA), staging puis promotion en prod par retag, rollback automatique |
 | CT | `.github/workflows/ct.yml`, flow `monitoring-check` | réentraînement sur nouvelles données, dérive, planification ou à la demande ; PR avec le nouveau `dvc.lock` |

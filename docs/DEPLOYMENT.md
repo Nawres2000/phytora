@@ -47,6 +47,8 @@ bash scripts/smoke_test.sh
 
 Pour une démo sur CPU, réduire le jeu de données dans `params.yaml` (`data.quick_n: 50`) avant de lancer le flow.
 
+Pour comparer plusieurs modèles sans toucher au modèle servi : déploiement `experiment-grid` (4 configurations en `dvc exp run --temp`, classement dans `reports/experiments.md`) et `cross-validation` (k-fold stratifié et groupé). Pour journaliser dans le MLflow de DagsHub plutôt qu'en local, renseigner `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME` et `MLFLOW_TRACKING_PASSWORD` dans `.env`.
+
 ## 5. Environnements staging et production (images du registry)
 La CD (`.github/workflows/cd.yml`) construit les images une seule fois par commit validé par la CI. Elle les pousse sur GHCR avec un tag immuable (le SHA), puis :
 

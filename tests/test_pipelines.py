@@ -79,3 +79,34 @@ def test_ingestion_quarantines_bad_files(fake_root, monkeypatch):
     assert out == {"accepted": 1, "rejected": 2}
     assert (fake_root / "data" / "raw" / "plantvillage" / "color" / "A___healthy" / "incoming_good.jpg").exists()
     assert len(list((fake_root / "data" / "quarantine").rglob("*.jpg"))) == 2
+
+
+def test_experiment_grid_survives_a_failing_experiment(fake_root, monkeypatch):
+    from src.pipelines import experiments
+
+    calls = []
+
+    def fake_sh(cmd, timeout=None):
+        calls.append(cmd)
+        if cmd[:3] == ["dvc", "exp", "run"] and "broken" in cmd:
+            raise flows.StageError("dvc exp run failed (exit 1): CUDA out of memory")
+        if cmd[:3] == ["dvc", "exp", "show"]:
+            exp = {
+                "name": "good",
+                "data": {
+                    "metrics": {"reports/metrics.json": {"data": {"test_acc": 0.9, "test_macro_f1": 0.88}}},
+                    "params": {"params.yaml": {"data": {"train": {"model": "mobilenet_v3_small"}}}},
+                },
+            }
+            return json.dumps([{"rev": "workspace", "experiments": [{"revs": [exp]}]}])
+        return ""
+
+    monkeypatch.setattr(experiments, "sh", fake_sh)
+    monkeypatch.setattr(experiments, "ROOT", fake_root)
+    monkeypatch.setattr(experiments, "write_alert", lambda *a, **k: None)
+    out = experiments.experiment_grid(quick_n=10, grid={"good": {"train.model": "mobilenet_v3_small"}, "broken": {"train.model": "x"}})
+    assert out["succeeded"] == ["good"] and out["failed"][0]["name"] == "broken"
+    assert out["ranking"][0]["test_macro_f1"] == 0.88
+    run_cmds = [c for c in calls if c[:3] == ["dvc", "exp", "run"]]
+    assert all("--temp" in c for c in run_cmds) and ["-S", "data.quick_n=10"] == run_cmds[0][-2:]
+    assert (fake_root / "reports" / "experiments.md").read_text().count("|") > 10

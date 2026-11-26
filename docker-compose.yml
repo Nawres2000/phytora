@@ -122,7 +122,11 @@ services:
     command: python -m src.pipelines.serve
     environment:
       PREFECT_API_URL: http://prefect-server:4200/api
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      # local MLflow server by default; set MLFLOW_TRACKING_URI=https://dagshub.com/Nawres2000/phytora.mlflow
+      # (+ MLFLOW_TRACKING_USERNAME / MLFLOW_TRACKING_PASSWORD) in .env to log into DagsHub's MLflow instead
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      MLFLOW_TRACKING_USERNAME: ${MLFLOW_TRACKING_USERNAME:-}
+      MLFLOW_TRACKING_PASSWORD: ${MLFLOW_TRACKING_PASSWORD:-}
       MODEL_API_URL: http://backend:8000
       ADMIN_TOKEN: *admin_token
       PREDICTION_LOG: /app/logs/predictions.jsonl
