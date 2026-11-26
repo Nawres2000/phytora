@@ -1,5 +1,6 @@
 [core]
     autostage = true
-    remote = storage
-['remote "storage"']
-    url = ../../phytora-dvc-storage
+    remote = origin
+['remote "origin"']
+    url = s3://dvc
+    endpointurl = https://dagshub.com/Nawres2000/phytora.s3
